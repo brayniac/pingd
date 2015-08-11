@@ -1,0 +1,35 @@
+language: rust
+sudo: false
+rust:
+  - nightly
+  - 1.1.0
+
+os:
+  - linux
+  - osx
+
+script:
+  - cargo test
+  - cargo doc --no-deps
+
+# Deploy documentation to S3 for specific branches. At some
+# point, it would be nice to also support building docs for
+# a specific tag
+deploy:
+  provider: s3
+  access_key_id: AKIAIGFX36YKEFRZJAXA
+  secret_access_key:
+    secure: blFcl9EMlWIiI+x8LZFWpyIxRZRScKWaftSXluFB0HLgbA1oYYX4lo8GgVYGQZ4kP3iIuL+WAlGvf3iCrAULGy0UOxLgvwOxX8XsgfCZpzF/Bw1G6od+IkPzbpNIgMtkceDhzZEmO+yatbAYCdMF0qq485QJ502inB7aeu1G94w=
+  bucket: rustdoc
+  endpoint: "rustdoc.s3-website-us-east-1.amazonaws.com"
+  skip_cleanup: true
+  local-dir: target/doc
+  upload-dir: mio/${TRAVIS_BRANCH}
+  acl: public_read
+  on:
+    condition: $TRAVIS_RUST_VERSION == "1.1.0" && $TRAVIS_OS_NAME == "linux"
+    repo: carllerche/mio
+    branch:
+      - master
+      - v0.4.x
+      - v0.3.x

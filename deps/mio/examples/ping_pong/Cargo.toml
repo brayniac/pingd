@@ -1,0 +1,11 @@
+[package]
+name = "ping_pong"
+version = "0.1.0"
+authors = ["Carl Lerche <me@carllerche.com>"]
+
+[dependencies.mio]
+path = "../../"
+
+[dependencies.bytes]
+git = "https://github.com/carllerche/bytes"
+branch = "v0.2.x"
