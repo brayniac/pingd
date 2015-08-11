@@ -1,5 +1,5 @@
 [package]
-name = "rustping"
+name = "pingd"
 version = "0.1.1"
 authors = ["Brian Martin <brayniac@gmail.com>"]
 
@@ -14,11 +14,3 @@ path = "./deps/mio/"
 log = "0.3.1"
 simple_logger = "0.3.1"
 time = "*"
-
-[profiles.release]
-opt-level = 0
-debug = true
-rpath = false
-lto = false
-debug-assertions = true
-codegen-units = 1

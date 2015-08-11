@@ -334,12 +334,12 @@ struct SimpleLogger;
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &LogMetadata) -> bool {
-        metadata.level() <= LogLevel::Debug
+        metadata.level() <= LogLevel::Info
     }
 
     fn log(&self, record: &LogRecord) {
         if self.enabled(record.metadata()) {
-            if record.location().module_path() == "rustping" {
+            if record.location().module_path() == "pingd" {
                 println!(
                     "{} {:<5} [{}] {}",
                     time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap(),
@@ -372,7 +372,7 @@ pub fn start(address: SocketAddr) {
 
 pub fn main() {
     let _ = log::set_logger(|max_log_level| {
-        max_log_level.set(LogLevelFilter::Debug);
+        max_log_level.set(LogLevelFilter::Info);
         return Box::new(SimpleLogger);
     });
 
