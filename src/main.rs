@@ -112,10 +112,13 @@ impl Connection {
 
         match self.state {
             State::Reading(..) => {
-                assert!(events.is_readable(),
-                    "unexpected events; events={:?}", events
-                );
-                self.read(event_loop)
+                if events.is_readable() {
+                    self.read(event_loop)
+                }
+                else {
+                    // TODO(brayniac): how should Error event be handled?
+                    warn!("unexpected events; events={:?}", events);
+                }
             }
             State::Writing(..) => {
                 assert!(events.is_writable(),
