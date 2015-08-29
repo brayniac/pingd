@@ -18,7 +18,7 @@ cargo build --release;
 [pingc](https://github.com/brayniac/pingc) is an example client
 
 ```shell
-./target/release/pingd --listen [HOST:PORT];
+./target/release/pingd --listen [HOST:PORT]
 ```
 
 ## Features
