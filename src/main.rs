@@ -3,6 +3,7 @@ extern crate log;
 extern crate time;
 extern crate mio;
 extern crate bytes;
+extern crate getopts;
 
 use mio::{TryRead, TryWrite};
 use mio::tcp::*;
@@ -11,6 +12,8 @@ use bytes::{Buf, Take};
 use std::mem;
 use std::net::SocketAddr;
 use std::io::Cursor;
+use getopts::Options;
+use std::env;
 use log::{Log, LogLevel, LogLevelFilter, LogMetadata, LogRecord};
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
@@ -41,7 +44,10 @@ impl mio::Handler for Server {
     type Timeout = (); // timeouts not used
     type Message = (); // cross-thread notifications not used
 
-    fn ready(&mut self, event_loop: &mut mio::EventLoop<Server>, token: mio::Token, events: mio::EventSet) {
+    fn ready(&mut self,
+             event_loop: &mut mio::EventLoop<Server>,
+             token: mio::Token,
+             events: mio::EventSet) {
         debug!("socket ready: token={:?} events={:?}", token, events);
 
         match token {
@@ -54,21 +60,18 @@ impl mio::Handler for Server {
                         debug!("accepted new client!");
 
                         // TODO: this panics when connections exceed slab size
-                        match self.connections.insert_with(|token| Connection::new(socket, token)) {
+                        match self.connections.insert_with(|token| Connection::new(socket,
+                                                                                   token)) {
                             Some(token) => {
-                                event_loop.register_opt(
-                                &self.connections[token].socket,
-                                token,
-                                mio::EventSet::readable(),
-                                mio::PollOpt::edge() | mio::PollOpt::oneshot()
-                                ).unwrap();
+                                event_loop.register_opt(&self.connections[token].socket, token,
+                                                        mio::EventSet::readable(),
+                                                        mio::PollOpt::edge() |
+                                                            mio::PollOpt::oneshot()).unwrap();
                             }
                             _ => {
                                 debug!("too many established connections")
                             }
                         }
-
-
 
                     }
                     Ok(None) => {
@@ -114,23 +117,20 @@ impl Connection {
             State::Reading(..) => {
                 if events.is_readable() {
                     self.read(event_loop)
-                }
-                else {
+                } else {
                     // TODO(brayniac): how should Error event be handled?
                     warn!("unexpected events; events={:?}", events);
                 }
             }
             State::Writing(..) => {
-                assert!(events.is_writable(),
-                    "unexpected events; events={:?}", events
-                );
+                assert!(events.is_writable(), "unexpected events; events={:?}", events);
                 self.write(event_loop)
             }
             _ => unimplemented!(),
         }
     }
 
-     fn read(&mut self, event_loop: &mut mio::EventLoop<Server>) {
+    fn read(&mut self, event_loop: &mut mio::EventLoop<Server>) {
         match self.socket.try_read_buf(self.state.mut_read_buf()) {
             Ok(Some(0)) => {
                 // If there is any data buffered up, attempt to write it back
@@ -147,7 +147,7 @@ impl Connection {
                     n if n > 0 => {
                         // Transition to a writing state even if a new line has
                         // not yet been received.
-                        self.state.transition_to_writing(n);
+                        self.state.transition_to_writing();
 
                         // Re-register the socket with the event loop. This
                         // will notify us when the socket becomes writable.
@@ -201,8 +201,8 @@ impl Connection {
     }
 
     fn reregister(&self, event_loop: &mut mio::EventLoop<Server>) {
-        event_loop.reregister(&self.socket, self.token, self.state.event_set(), mio::PollOpt::oneshot())
-            .unwrap();
+        event_loop.reregister(&self.socket, self.token, self.state.event_set(),
+                              mio::PollOpt::oneshot()).unwrap();
     }
 
     fn is_closed(&self) -> bool {
@@ -258,16 +258,15 @@ impl State {
     // Looks for a new line, if there is one the state is transitioned to
     // writing
     fn try_transition_to_writing(&mut self) {
-        if let Some(pos) = self.read_buf().iter().position(|b| *b == b'\n') {
-            self.transition_to_writing(pos + 1);
+        if let Some(_) = self.read_buf().iter().position(|b| *b == b'\n') {
+            self.transition_to_writing();
         }
     }
 
-    fn transition_to_writing(&mut self, pos: usize) {
+    fn transition_to_writing(&mut self) {
         // First, consume the current read buffer, replacing it with an
         // empty Vec<u8>.
-        let msg = mem::replace(self, State::Closed)
-            .unwrap_read_buf();
+        let msg = mem::replace(self, State::Closed).unwrap_read_buf();
 
         let mut rsp = "ERROR\n".to_string().into_bytes();
 
@@ -289,9 +288,7 @@ impl State {
     // step.
     fn try_transition_to_reading(&mut self) {
         if !self.write_buf().has_remaining() {
-            let cursor = mem::replace(self, State::Closed)
-                .unwrap_write_buf()
-                .into_inner();
+            let cursor = mem::replace(self, State::Closed).unwrap_write_buf().into_inner();
 
             let pos = cursor.position();
             let mut buf = cursor.into_inner();
@@ -343,12 +340,10 @@ impl log::Log for SimpleLogger {
     fn log(&self, record: &LogRecord) {
         if self.enabled(record.metadata()) {
             if record.location().module_path() == "pingd" {
-                println!(
-                    "{} {:<5} [{}] {}",
-                    time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap(),
-                    record.level().to_string(),
-                    record.location().module_path(),
-                    record.args());
+                println!("{} {:<5} [{}] {}",
+                         time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap(),
+                         record.level().to_string(), record.location().module_path(),
+                         record.args());
             }
         }
     }
@@ -373,15 +368,43 @@ pub fn start(address: SocketAddr) {
     event_loop.run(&mut srv).unwrap();
 }
 
+fn print_usage(program: &str, opts: Options) {
+    let brief = format!("Usage: {} [options]", program);
+    print!("{}", opts.usage(&brief));
+}
+
 pub fn main() {
+    let args: Vec<String> = env::args().collect();
+    let program = args[0].clone();
+
     let _ = log::set_logger(|max_log_level| {
         max_log_level.set(LogLevelFilter::Info);
         return Box::new(SimpleLogger);
     });
 
+    let mut opts = Options::new();
+
+    opts.optopt("l", "listen", "listen address", "HOST:PORT");
+    opts.optflag("h", "help", "print this help menu");
+
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => { m }
+        Err(f) => { panic!(f.to_string()) }
+    };
+    if matches.opt_present("h") {
+        print_usage(&program, opts);
+        return;
+    }
+    if !matches.opt_present("l") {
+        error!("require listen parameter");
+        print_usage(&program, opts);
+        return;
+    }
+    let listen = matches.opt_str("l").unwrap();
+
     info!("rustping {} initializing...",VERSION);
 
-    start("0.0.0.0:6567".parse().unwrap());
+    start(listen.parse().unwrap());
 }
 
 fn drain_to(vec: &mut Vec<u8>, count: usize) {

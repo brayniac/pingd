@@ -1,6 +1,6 @@
 [package]
 name = "pingd"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Brian Martin <brayniac@gmail.com>"]
 
 [dependencies.bytes]
@@ -14,3 +14,4 @@ path = "./deps/mio/"
 log = "0.3.1"
 simple_logger = "0.3.1"
 time = "*"
+getopts = "*"

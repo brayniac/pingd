@@ -15,12 +15,10 @@ cargo build --release;
 
 ## Usage
 
-This server currently binds to 0.0.0.0:6567 
-
 [pingc](https://github.com/brayniac/pingc) is an example client
 
 ```shell
-./target/release/pingd;
+./target/release/pingd --listen [HOST:PORT];
 ```
 
 ## Features
